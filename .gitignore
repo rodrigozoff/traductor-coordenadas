@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Temporary files
+*.tmp
+*.temp
+resultadoFede
+
+# Output files (examples)
+rosario_gk.csv
+rosario_gk_precision.csv
+*_resultado.csv
+*_convertidas_*.csv
+*_convertidas_*.kml
+*_convertidas_*.geojson
+*_convertidas_*.kmz
+
+# Test outputs
+test_*.csv
+test_*.kml
+test_*.geojson
