@@ -27,11 +27,14 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .info-box {
-        background-color: #f0f2f6;
-        padding: 1rem;
+        background-color: #e8f4fd;
+        padding: 1.5rem;
         border-radius: 0.5rem;
         border-left: 4px solid #1f77b4;
         margin: 1rem 0;
+        color: #2c3e50;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .success-box {
         background-color: #d4edda;
