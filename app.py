@@ -11,6 +11,7 @@ from pathlib import Path
 import base64
 import folium
 from streamlit_folium import st_folium
+import math
 
 # Configuración de la página
 st.set_page_config(
@@ -150,6 +151,68 @@ def create_kml(df, name="Coordenadas"):
             placemarks.append(placemark)
     
     return kml_template.format(name=name, placemarks='\n'.join(placemarks))
+
+def calculate_polygon_area_gk(coordinates_gk):
+    """
+    Calcula el área de un polígono usando coordenadas Gauss-Krüger.
+    Usa la fórmula del área de Shoelace (coordenadas cartesianas).
+    
+    Args:
+        coordinates_gk: Lista de tuplas (easting, northing)
+    
+    Returns:
+        Área en metros cuadrados
+    """
+    if len(coordinates_gk) < 3:
+        return 0
+    
+    # Asegurar que el polígono esté cerrado
+    coords = list(coordinates_gk)
+    if coords[0] != coords[-1]:
+        coords.append(coords[0])
+    
+    # Fórmula de Shoelace
+    area = 0
+    n = len(coords) - 1
+    
+    for i in range(n):
+        area += coords[i][0] * coords[i+1][1]
+        area -= coords[i+1][0] * coords[i][1]
+    
+    return abs(area) / 2
+
+def calculate_polygon_area_wgs84(coordinates_wgs84):
+    """
+    Calcula el área aproximada de un polígono usando coordenadas WGS84.
+    Usa proyección local para pequeñas áreas.
+    
+    Args:
+        coordinates_wgs84: Lista de tuplas (lat, lng)
+    
+    Returns:
+        Área en metros cuadrados
+    """
+    if len(coordinates_wgs84) < 3:
+        return 0
+    
+    # Convertir a coordenadas cartesianas locales
+    # Usar el centro del polígono como origen
+    center_lat = sum(coord[0] for coord in coordinates_wgs84) / len(coordinates_wgs84)
+    center_lng = sum(coord[1] for coord in coordinates_wgs84) / len(coordinates_wgs84)
+    
+    # Factores de conversión aproximados para Argentina
+    lat_to_m = 111320  # metros por grado de latitud
+    lng_to_m = 111320 * math.cos(math.radians(center_lat))  # metros por grado de longitud
+    
+    # Convertir a coordenadas cartesianas locales
+    local_coords = []
+    for lat, lng in coordinates_wgs84:
+        x = (lng - center_lng) * lng_to_m
+        y = (lat - center_lat) * lat_to_m
+        local_coords.append((x, y))
+    
+    # Usar fórmula de Shoelace
+    return calculate_polygon_area_gk(local_coords)
 
 def main():
     # Título principal
@@ -457,11 +520,30 @@ def main():
                     center_lat = (min_lat + max_lat) / 2
                     center_lng = (min_lng + max_lng) / 2
                     
+                    # Calcular área del polígono si hay suficientes puntos
+                    area_info = ""
+                    if len(df_result) >= 3:
+                        if 'coordenadas_gauss_kruger_easting' in df_result.columns and 'coordenadas_gauss_kruger_northing' in df_result.columns:
+                            # Usar coordenadas Gauss-Krüger para mayor precisión
+                            gk_coords = [(row['coordenadas_gauss_kruger_easting'], row['coordenadas_gauss_kruger_northing']) 
+                                        for _, row in df_result.iterrows()]
+                            area_m2 = calculate_polygon_area_gk(gk_coords)
+                        else:
+                            # Usar coordenadas WGS84
+                            wgs84_coords = [(row['lat'], row['lng']) for _, row in df_result.iterrows()]
+                            area_m2 = calculate_polygon_area_wgs84(wgs84_coords)
+                        
+                        # Convertir a diferentes unidades
+                        area_ha = area_m2 / 10000  # hectáreas
+                        
+                        if area_m2 < 10000:  # Menos de 1 hectárea
+                            area_info = f"\n📐 **Área del polígono**: {area_m2:.2f} m²"
+                        else:
+                            area_info = f"\n📐 **Área del polígono**: {area_ha:.4f} ha ({area_m2:,.0f} m²)"
+                    
                     st.info(f"""
                     📍 **Centro del mapa**: {center_lat:.8f}, {center_lng:.8f}
-                    📏 **Puntos mostrados**: {len(df_result)}
-                    🔍 **Vista**: Ajustada automáticamente con padding del 5%
-                    📐 **Área cubierta**: {lat_range:.6f}° × {lng_range:.6f}°
+                    📏 **Puntos mostrados**: {len(df_result)}{area_info}
                     """)
                 
                 # Botones de descarga
