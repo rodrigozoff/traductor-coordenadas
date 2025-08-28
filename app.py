@@ -273,18 +273,7 @@ def main():
             """)
     
     with col2:
-        st.header("📊 Información de precisión")
-        
-        st.metric("Precisión Gauss-Krüger", "1 micrón", "6 decimales")
-        st.metric("Precisión WGS84", "1.1 cm", "10 decimales")
-        st.metric("Zona de cobertura", "Argentina Central", "EPSG:22195")
-        
-        st.markdown("""
-        <div class="info-box">
-            <h4>✅ Certificación</h4>
-            <p>Cumple normativas del IGN y colegios de agrimensores argentinos.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        pass  # Columna vacía para balance visual
     
     # Procesamiento de datos
     df_input = None
@@ -551,6 +540,43 @@ def main():
         <p>Rosario, Santa Fe, Buenos Aires</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Información de precisión en el footer
+    st.markdown("---")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown("""
+        <div style="text-align: center; padding: 10px;">
+            <h6>📐 Precisión GK</h6>
+            <p style="margin: 0; font-size: 0.8em;">1 micrón<br><small>6 decimales</small></p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 10px;">
+            <h6>🌍 Precisión WGS84</h6>
+            <p style="margin: 0; font-size: 0.8em;">1.1 cm<br><small>10 decimales</small></p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div style="text-align: center; padding: 10px;">
+            <h6>📍 Zona</h6>
+            <p style="margin: 0; font-size: 0.8em;">Argentina Central<br><small>EPSG:22195</small></p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown("""
+        <div style="text-align: center; padding: 10px;">
+            <h6>✅ Certificación</h6>
+            <p style="margin: 0; font-size: 0.8em;">IGN y colegios<br><small>de agrimensores</small></p>
+        </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
