@@ -396,16 +396,32 @@ def main():
                 if 'lat' in df_result.columns and 'lng' in df_result.columns:
                     st.subheader("🗺️ Visualización del polígono")
                     
-                    # Crear mapa centrado en las coordenadas
-                    center_lat = df_result['lat'].mean()
-                    center_lng = df_result['lng'].mean()
+                    # Ayuda sobre interacción con el mapa
+                    st.info("💡 **Tip**: Haz clic en los marcadores rojos 📍 para ver las coordenadas en ambos sistemas (WGS84 y Gauss-Krüger)")
                     
-                    # Crear el mapa con Folium
-                    m = folium.Map(
-                        location=[center_lat, center_lng],
-                        zoom_start=18,
-                        tiles='OpenStreetMap'
-                    )
+                    # Calcular bounds para mostrar todos los puntos con padding
+                    min_lat = df_result['lat'].min()
+                    max_lat = df_result['lat'].max()
+                    min_lng = df_result['lng'].min()
+                    max_lng = df_result['lng'].max()
+                    
+                    # Agregar padding (5% del rango en cada dirección)
+                    lat_range = max_lat - min_lat
+                    lng_range = max_lng - min_lng
+                    padding_lat = max(lat_range * 0.05, 0.0001)  # Mínimo padding para puntos muy cercanos
+                    padding_lng = max(lng_range * 0.05, 0.0001)
+                    
+                    # Crear bounds con padding
+                    bounds = [
+                        [min_lat - padding_lat, min_lng - padding_lng],  # Southwest
+                        [max_lat + padding_lat, max_lng + padding_lng]   # Northeast
+                    ]
+                    
+                    # Crear el mapa
+                    m = folium.Map(tiles='OpenStreetMap')
+                    
+                    # Ajustar el mapa para mostrar todos los puntos
+                    m.fit_bounds(bounds)
                     
                     # Agregar marcadores para cada punto
                     for idx, row in df_result.iterrows():
@@ -454,10 +470,14 @@ def main():
                     map_data = st_folium(m, width=700, height=500)
                     
                     # Información del mapa
+                    center_lat = (min_lat + max_lat) / 2
+                    center_lng = (min_lng + max_lng) / 2
+                    
                     st.info(f"""
                     📍 **Centro del mapa**: {center_lat:.8f}, {center_lng:.8f}
                     📏 **Puntos mostrados**: {len(df_result)}
-                    🔍 **Zoom**: Nivel 18 (alta precisión)
+                    🔍 **Vista**: Ajustada automáticamente con padding del 5%
+                    📐 **Área cubierta**: {lat_range:.6f}° × {lng_range:.6f}°
                     """)
                 
                 # Botones de descarga
