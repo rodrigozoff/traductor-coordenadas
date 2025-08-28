@@ -174,7 +174,7 @@ def main():
         
         conversion_mode = st.selectbox(
             "Tipo de conversión:",
-            ["WGS84 → Gauss-Krüger", "Gauss-Krüger → WGS84", "KML → Gauss-Krüger", "KML → WGS84"],
+            ["KML → Gauss-Krüger", "WGS84 → Gauss-Krüger", "Gauss-Krüger → WGS84"],
             help="Selecciona el tipo de conversión que necesitas"
         )
         
@@ -353,11 +353,6 @@ def main():
                 if conversion_mode == "WGS84 → Gauss-Krüger" or conversion_mode == "KML → Gauss-Krüger":
                     df_result, errors = convert_wgs84_to_gk(df_input)
                     result_title = "Coordenadas en Gauss-Krüger"
-                elif conversion_mode == "KML → WGS84":
-                    # Para KML a WGS84, los datos ya están en WGS84, solo agregar columnas GK vacías para consistencia
-                    df_result = df_input.copy()
-                    errors = []
-                    result_title = "Vértices extraídos en WGS84"
                 else:
                     df_result, errors = convert_gk_to_wgs84(df_input)
                     result_title = "Coordenadas en WGS84"
