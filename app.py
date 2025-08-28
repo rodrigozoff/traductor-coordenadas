@@ -9,6 +9,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 import base64
+import folium
+from streamlit_folium import st_folium
 
 # Configuración de la página
 st.set_page_config(
@@ -389,6 +391,74 @@ def main():
                     df_display_result['coordenadas_gauss_kruger_northing'] = df_display_result['coordenadas_gauss_kruger_northing'].apply(lambda x: f"{x:.6f}")
                 
                 st.dataframe(df_display_result, use_container_width=True)
+                
+                # Mostrar mapa si hay coordenadas WGS84
+                if 'lat' in df_result.columns and 'lng' in df_result.columns:
+                    st.subheader("🗺️ Visualización del polígono")
+                    
+                    # Crear mapa centrado en las coordenadas
+                    center_lat = df_result['lat'].mean()
+                    center_lng = df_result['lng'].mean()
+                    
+                    # Crear el mapa con Folium
+                    m = folium.Map(
+                        location=[center_lat, center_lng],
+                        zoom_start=18,
+                        tiles='OpenStreetMap'
+                    )
+                    
+                    # Agregar marcadores para cada punto
+                    for idx, row in df_result.iterrows():
+                        # Crear popup con información de ambos sistemas de coordenadas
+                        popup_content = f"""
+                        <b>{row['nombre']}</b><br>
+                        <hr>
+                        <b>🌍 WGS84:</b><br>
+                        Lat: {row['lat']:.10f}<br>
+                        Lng: {row['lng']:.10f}<br>
+                        """
+                        
+                        # Agregar coordenadas Gauss-Krüger si están disponibles
+                        if 'coordenadas_gauss_kruger_easting' in row and 'coordenadas_gauss_kruger_northing' in row:
+                            popup_content += f"""
+                            <br><b>📐 Gauss-Krüger:</b><br>
+                            Easting: {row['coordenadas_gauss_kruger_easting']:.6f}<br>
+                            Northing: {row['coordenadas_gauss_kruger_northing']:.6f}<br>
+                            <small>EPSG:22195 - Zona 5</small>
+                            """
+                        
+                        folium.Marker(
+                            [row['lat'], row['lng']],
+                            popup=folium.Popup(popup_content, max_width=300),
+                            tooltip=row['nombre'],
+                            icon=folium.Icon(color='red', icon='info-sign')
+                        ).add_to(m)
+                    
+                    # Si hay más de 2 puntos, crear polígono
+                    if len(df_result) > 2:
+                        coordinates = [[row['lat'], row['lng']] for _, row in df_result.iterrows()]
+                        # Cerrar el polígono si no está cerrado
+                        if coordinates[0] != coordinates[-1]:
+                            coordinates.append(coordinates[0])
+                        
+                        folium.Polygon(
+                            locations=coordinates,
+                            color='blue',
+                            weight=2,
+                            fillColor='lightblue',
+                            fillOpacity=0.3,
+                            popup="Polígono del loteo"
+                        ).add_to(m)
+                    
+                    # Mostrar el mapa
+                    map_data = st_folium(m, width=700, height=500)
+                    
+                    # Información del mapa
+                    st.info(f"""
+                    📍 **Centro del mapa**: {center_lat:.8f}, {center_lng:.8f}
+                    📏 **Puntos mostrados**: {len(df_result)}
+                    🔍 **Zoom**: Nivel 18 (alta precisión)
+                    """)
                 
                 # Botones de descarga
                 st.subheader("📥 Descargar resultados")
