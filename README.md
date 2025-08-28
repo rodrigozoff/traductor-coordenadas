@@ -305,6 +305,7 @@ Mojón esquina NE,5439229.945221076,6355430.748343553
 ## Contacto y Soporte
 
 **Desarrollador**: Rodrigo Zoff  
+**Email**: rodrigo@zoff.tech  
 **Año**: 2025  
 **Licencia**: MIT
 

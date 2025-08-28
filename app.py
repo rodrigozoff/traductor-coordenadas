@@ -375,8 +375,9 @@ def main():
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 2rem;">
         <p><strong>Conversor de Coordenadas Gauss-Krüger ↔ WGS84</strong></p>
-        <p>Desarrollado por Rodrigo Zoff • 2025 • Precisión catastral para Argentina</p>
-        <p>Sistema optimizado para Zona 5 (EPSG:22195) - Rosario, Santa Fe, Buenos Aires</p>
+        <p>Desarrollado por Rodrigo Zoff • <a href="mailto:rodrigo@zoff.tech">rodrigo@zoff.tech</a> • 2025</p>
+        <p>Precisión catastral para Argentina • Sistema optimizado para Zona 5 (EPSG:22195)</p>
+        <p>Rosario, Santa Fe, Buenos Aires</p>
     </div>
     """, unsafe_allow_html=True)
 
