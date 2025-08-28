@@ -1,0 +1,46 @@
+{
+  "type": "FeatureCollection",
+  "name": "fede-gk",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fede-gk",
+        "description": "Polígono generado automáticamente"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -60.73873681909167,
+              -33.09297279541615
+            ],
+            [
+              -60.728096561768666,
+              -33.092430492006876
+            ],
+            [
+              -60.72703748810265,
+              -33.097278886598716
+            ],
+            [
+              -60.7374360963661,
+              -33.098907907593144
+            ],
+            [
+              -60.73873681909167,
+              -33.09297279541615
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

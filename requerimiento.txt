@@ -1,0 +1,23 @@
+Necesito traducir coordenadas de Google Maps a coordenadas Gauss Kruger.
+También necesito traducir coordenadas Gauss Kruger a coordenadas Google Maps.
+Estas coordenadas son usadas en Argentina, esto es importante para que el programa sea capaz de manejar correctamente los valores.
+El formato de las coordenadas de Google Maps es: lat,lng
+El formato de las coordenadas Gauss Kruger es: EEE,NNN
+Donde EEE es la longitud y NNN es la latitud.
+Por ejemplo, las coordenadas de Google Maps (34.052235,-118.243683) se traducen a coordenadas Gauss Kruger (500000,4000000).
+También necesito que el programa sea capaz de leer un archivo csv con las coordenadas de Google Maps y generar un archivo csv con las coordenadas Gauss Kruger.
+El archivo csv tendrá el siguiente formato: nombre,coordenadas_google_maps,coordenadas_gauss_kruger
+Por ejemplo, el archivo csv podría tener el siguiente contenido:
+nombre,coordenadas_google_maps,coordenadas_gauss_kruger
+ubicacion1,34.052235,-118.243683,500000,4000000
+ubicacion2,-34.052235,118.243683,600000,5000000
+Necesito que el programa sea capaz de leer el archivo csv y generar un archivo csv con las coordenadas Gauss Kruger.
+El nombre del archivo de salida debe ser el mismo que el del archivo de entrada, pero con el prefijo "gauss_kruger_".
+Por ejemplo, si el archivo de entrada se llama "coordenadas.csv", el archivo de salida se llamará "gauss_kruger_coordenadas.csv".
+También necesito que el programa sea capaz de leer el archivo csv con las coordenadas Gauss Kruger y generar un archivo csv con las coordenadas Google Maps.
+El nombre del archivo de salida debe ser el mismo que el del archivo de entrada, pero con el prefijo "google_maps_".
+Por ejemplo, si el archivo de entrada se llama "gauss_kruger_coordenadas.csv", el archivo de salida se llamará "google_maps_coordenadas.csv".
+El programa debe ser capaz de manejar archivos csv con miles de filas.
+El programa debe ser capaz de manejar errores en el archivo csv y continuar con la siguiente fila.
+El programa debe ser capaz de manejar errores en las coordenadas y continuar con la siguiente fila.
+Los errores se deben detallar en cada linea.
