@@ -107,6 +107,16 @@ python convert_gk_to_wgs84.py wgs84_to_gk coordenadas.csv resultado
 python convert_gk_to_wgs84.py gk_to_wgs84 coordenadas_gk.csv resultado
 ```
 
+#### 3. **KML → Gauss-Krüger** (extraer vértices de polígonos KML)
+```bash
+python convert_gk_to_wgs84.py kml_to_gk poligono.kml resultado
+```
+
+#### 4. **KML → WGS84** (extraer y convertir vértices de KML)
+```bash
+python convert_gk_to_wgs84.py kml_to_wgs84 poligono.kml resultado
+```
+
 ### Archivos generados:
 
 #### Para conversión a Gauss-Krüger:

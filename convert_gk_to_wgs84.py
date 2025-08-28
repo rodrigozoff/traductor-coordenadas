@@ -19,11 +19,139 @@ import csv
 import json
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
 import pyproj
 from pyproj import Transformer
+
+def parse_kml_polygon(kml_path: str) -> List[Tuple[float, float, str]]:
+    """Extrae vértices de polígonos de un archivo KML.
+    
+    Args:
+        kml_path: Ruta al archivo KML
+        
+    Returns:
+        Lista de tuplas (nombre, lat, lng) con los vértices del polígono
+    """
+    coordinates = []
+    
+    try:
+        # Parsear el archivo KML
+        tree = ET.parse(kml_path)
+        root = tree.getroot()
+        
+        # Namespace de KML
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+        
+        # Buscar todos los polígonos
+        polygons = root.findall('.//kml:Polygon', ns)
+        
+        for i, polygon in enumerate(polygons):
+            # Buscar el anillo exterior (outerBoundaryIs)
+            outer_boundary = polygon.find('.//kml:outerBoundaryIs/kml:LinearRing/kml:coordinates', ns)
+            
+            if outer_boundary is not None and outer_boundary.text:
+                # Parsear las coordenadas (formato: lng,lat,alt lng,lat,alt ...)
+                coords_text = outer_boundary.text.strip()
+                coord_pairs = coords_text.split()
+                
+                for j, coord_pair in enumerate(coord_pairs):
+                    try:
+                        parts = coord_pair.split(',')
+                        if len(parts) >= 2:
+                            lng = float(parts[0])
+                            lat = float(parts[1])
+                            
+                            # Nombre del vértice
+                            vertex_name = f"Polígono_{i+1}_Vértice_{j+1}"
+                            
+                            coordinates.append((vertex_name, lat, lng))
+                    except (ValueError, IndexError) as e:
+                        print(f"Error parseando coordenada '{coord_pair}': {e}")
+                        continue
+        
+        # También buscar puntos individuales (Placemark con Point)
+        placemarks = root.findall('.//kml:Placemark', ns)
+        
+        for placemark in placemarks:
+            name_elem = placemark.find('kml:name', ns)
+            point_elem = placemark.find('.//kml:Point/kml:coordinates', ns)
+            
+            if point_elem is not None and point_elem.text:
+                try:
+                    coords_text = point_elem.text.strip()
+                    parts = coords_text.split(',')
+                    if len(parts) >= 2:
+                        lng = float(parts[0])
+                        lat = float(parts[1])
+                        
+                        # Usar el nombre del placemark o generar uno
+                        point_name = name_elem.text if name_elem is not None and name_elem.text else f"Punto_{len(coordinates)+1}"
+                        
+                        coordinates.append((point_name, lat, lng))
+                except (ValueError, IndexError) as e:
+                    print(f"Error parseando punto: {e}")
+                    continue
+    
+    except ET.ParseError as e:
+        raise ValueError(f"Error parseando archivo KML: {e}")
+    except FileNotFoundError:
+        raise ValueError(f"Archivo KML no encontrado: {kml_path}")
+    
+    if not coordinates:
+        raise ValueError("No se encontraron coordenadas válidas en el archivo KML")
+    
+    return coordinates
+
+def convert_kml_to_csv(input_path: str, output_base: str, target_system: str = "gk") -> None:
+    """Convierte un archivo KML con polígonos a CSV con coordenadas convertidas.
+    
+    Args:
+        input_path: Ruta al archivo KML de entrada
+        output_base: Nombre base para los archivos de salida
+        target_system: Sistema de destino ('gk' para Gauss-Krüger, 'wgs84' para WGS84)
+    """
+    # Extraer coordenadas del KML
+    coordinates = parse_kml_polygon(input_path)
+    
+    print(f"Extraídos {len(coordinates)} vértices del archivo KML")
+    
+    # Crear archivo CSV temporal con las coordenadas extraídas
+    temp_csv = f"{output_base}_temp.csv"
+    
+    with open(temp_csv, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['nombre', 'lat', 'lng'])
+        
+        for name, lat, lng in coordinates:
+            writer.writerow([name, lat, lng])
+    
+    try:
+        # Convertir usando las funciones existentes
+        if target_system.lower() == "gk":
+            convert_wgs84_to_gk(temp_csv, output_base)
+            print(f"\nConversión de KML a Gauss-Krüger completada.")
+        else:
+            # Si ya está en WGS84, solo generar los archivos de salida
+            final_csv = f"{output_base}.csv"
+            
+            # Copiar el archivo temporal al final
+            with open(temp_csv, 'r', encoding='utf-8') as src, \
+                 open(final_csv, 'w', newline='', encoding='utf-8') as dst:
+                dst.write(src.read())
+            
+            # Crear archivos KML y GeoJSON
+            create_kml(f"{output_base}.kml", coordinates, name=Path(input_path).stem)
+            create_geojson(f"{output_base}.geojson", coordinates, name=Path(input_path).stem)
+            
+            print(f"\nExtracción de vértices de KML completada.")
+    
+    finally:
+        # Limpiar archivo temporal
+        if Path(temp_csv).exists():
+            Path(temp_csv).unlink()
 
 def create_kml(output_path: str, coordinates: list, name: str = "Polígono") -> None:
     """Crea un archivo KML con un polígono a partir de las coordenadas.
@@ -292,12 +420,17 @@ def main():
         print("Uso:")
         print("  python convert_gk_to_wgs84.py gk_to_wgs84 input.csv output_base_name")
         print("  python convert_gk_to_wgs84.py wgs84_to_gk input.csv output_base_name")
+        print("  python convert_gk_to_wgs84.py kml_to_gk input.kml output_base_name")
+        print("  python convert_gk_to_wgs84.py kml_to_wgs84 input.kml output_base_name")
         print("\nModos disponibles:")
         print("  gk_to_wgs84: Convierte de Gauss-Krüger a WGS84 (lat/lng)")
         print("  wgs84_to_gk: Convierte de WGS84 (lat/lng) a Gauss-Krüger")
+        print("  kml_to_gk: Extrae vértices de KML y convierte a Gauss-Krüger")
+        print("  kml_to_wgs84: Extrae vértices de KML y mantiene en WGS84")
         print("\nFormatos de entrada:")
         print("  Para gk_to_wgs84: nombre,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing")
         print("  Para wgs84_to_gk: nombre,lat,lng")
+        print("  Para kml_to_*: Archivo KML con polígonos o puntos")
         sys.exit(1)
         
     mode = sys.argv[1]
@@ -305,8 +438,9 @@ def main():
     output_base = sys.argv[3]
     
     # Validar modo
-    if mode not in ['gk_to_wgs84', 'wgs84_to_gk']:
-        print(f"Error: Modo '{mode}' no válido. Use 'gk_to_wgs84' o 'wgs84_to_gk'")
+    valid_modes = ['gk_to_wgs84', 'wgs84_to_gk', 'kml_to_gk', 'kml_to_wgs84']
+    if mode not in valid_modes:
+        print(f"Error: Modo '{mode}' no válido. Use uno de: {', '.join(valid_modes)}")
         sys.exit(1)
     
     # Eliminar la extensión si se proporcionó
@@ -328,6 +462,16 @@ def main():
             convert_wgs84_to_gk(input_path, str(output_base))
             print(f"\nConversión de WGS84 a Gauss-Krüger completada. Archivo generado:")
             print(f"- {output_base}.csv: Coordenadas en formato CSV")
+        elif mode == 'kml_to_gk':
+            convert_kml_to_csv(input_path, str(output_base), "gk")
+            print(f"\nArchivos generados:")
+            print(f"- {output_base}.csv: Vértices convertidos a Gauss-Krüger")
+        elif mode == 'kml_to_wgs84':
+            convert_kml_to_csv(input_path, str(output_base), "wgs84")
+            print(f"\nArchivos generados:")
+            print(f"- {output_base}.csv: Vértices extraídos en WGS84")
+            print(f"- {output_base}.kml: Polígono en formato KML")
+            print(f"- {output_base}.geojson: Polígono en formato GeoJSON")
     except Exception as e:
         print(f"\nError durante la conversión: {e}", file=sys.stderr)
         sys.exit(1)

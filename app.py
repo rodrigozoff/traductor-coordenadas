@@ -5,7 +5,9 @@ from pyproj import Transformer
 import io
 import zipfile
 import json
+import xml.etree.ElementTree as ET
 from datetime import datetime
+from pathlib import Path
 import base64
 
 # Configuración de la página
@@ -170,7 +172,7 @@ def main():
         
         conversion_mode = st.selectbox(
             "Tipo de conversión:",
-            ["WGS84 → Gauss-Krüger", "Gauss-Krüger → WGS84"],
+            ["WGS84 → Gauss-Krüger", "Gauss-Krüger → WGS84", "KML → Gauss-Krüger", "KML → WGS84"],
             help="Selecciona el tipo de conversión que necesitas"
         )
         
@@ -185,12 +187,22 @@ def main():
             Mojón 1,-32.9442,-60.6505
             ```
             """)
-        else:
+        elif conversion_mode == "Gauss-Krüger → WGS84":
             st.markdown("""
             **📄 Formato requerido:**
             ```csv
             nombre,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing
             Mojón 1,5439229.95,6355430.75
+            ```
+            """)
+        elif "KML" in conversion_mode:
+            st.markdown("""
+            **📄 Formato requerido:**
+            ```xml
+            Archivo KML con polígonos o puntos
+            - Google Earth (.kml)
+            - Polígonos con vértices
+            - Puntos individuales
             ```
             """)
         
@@ -205,34 +217,58 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.header("📁 Cargar archivo CSV")
-        
-        uploaded_file = st.file_uploader(
-            "Selecciona tu archivo CSV:",
-            type=['csv'],
-            help="Archivo CSV con las coordenadas a convertir"
-        )
+        if "KML" in conversion_mode:
+            st.header("📁 Cargar archivo KML")
+            
+            uploaded_file = st.file_uploader(
+                "Selecciona tu archivo KML:",
+                type=['kml'],
+                help="Archivo KML con polígonos o puntos para extraer vértices"
+            )
+        else:
+            st.header("📁 Cargar archivo CSV")
+            
+            uploaded_file = st.file_uploader(
+                "Selecciona tu archivo CSV:",
+                type=['csv'],
+                help="Archivo CSV con las coordenadas a convertir"
+            )
         
         # Ejemplo de datos
-        st.subheader("📋 Datos de ejemplo")
-        if conversion_mode == "WGS84 → Gauss-Krüger":
-            example_data = pd.DataFrame({
-                'nombre': ['Centro de Rosario', 'Monumento a la Bandera', 'Puerto de Rosario'],
-                'lat': [-32.9442, -32.9477, -32.9398],
-                'lng': [-60.6505, -60.6395, -60.6278]
-            })
+        if "KML" not in conversion_mode:
+            st.subheader("📋 Datos de ejemplo")
+            if conversion_mode == "WGS84 → Gauss-Krüger":
+                example_data = pd.DataFrame({
+                    'nombre': ['Centro de Rosario', 'Monumento a la Bandera', 'Puerto de Rosario'],
+                    'lat': [-32.9442, -32.9477, -32.9398],
+                    'lng': [-60.6505, -60.6395, -60.6278]
+                })
+            else:
+                example_data = pd.DataFrame({
+                    'nombre': ['Mojón 1', 'Mojón 2', 'Mojón 3'],
+                    'coordenadas_gauss_kruger_easting': [5439229.945221, 5440260.962679, 5441349.818856],
+                    'coordenadas_gauss_kruger_northing': [6355430.748344, 6355048.873111, 6355931.615095]
+                })
+            
+            st.dataframe(example_data, use_container_width=True)
+            
+            # Botón para usar datos de ejemplo
+            if st.button("🔄 Usar datos de ejemplo", type="secondary"):
+                st.session_state.example_data = example_data
         else:
-            example_data = pd.DataFrame({
-                'nombre': ['Mojón 1', 'Mojón 2', 'Mojón 3'],
-                'coordenadas_gauss_kruger_easting': [5439229.945221, 5440260.962679, 5441349.818856],
-                'coordenadas_gauss_kruger_northing': [6355430.748344, 6355048.873111, 6355931.615095]
-            })
-        
-        st.dataframe(example_data, use_container_width=True)
-        
-        # Botón para usar datos de ejemplo
-        if st.button("🔄 Usar datos de ejemplo", type="secondary"):
-            st.session_state.example_data = example_data
+            st.subheader("📋 Información sobre KML")
+            st.info("""
+            **Tipos de geometrías soportadas:**
+            - 🔺 **Polígonos**: Extrae todos los vértices del perímetro
+            - 📍 **Puntos**: Extrae coordenadas individuales
+            - 📁 **Múltiples elementos**: Procesa todos los elementos del archivo
+            
+            **Fuentes compatibles:**
+            - Google Earth
+            - QGIS
+            - ArcGIS
+            - Cualquier software que genere KML estándar
+            """)
     
     with col2:
         st.header("📊 Información de precisión")
@@ -253,12 +289,45 @@ def main():
     
     if uploaded_file is not None:
         try:
-            df_input = pd.read_csv(uploaded_file)
-            st.success(f"✅ Archivo cargado: {len(df_input)} filas")
+            if "KML" in conversion_mode:
+                # Procesar archivo KML
+                # Guardar temporalmente el archivo KML
+                temp_kml_path = f"temp_{uploaded_file.name}"
+                with open(temp_kml_path, "wb") as f:
+                    f.write(uploaded_file.read())
+                
+                # Usar la función del script principal
+                from convert_gk_to_wgs84 import parse_kml_polygon
+                coordinates = parse_kml_polygon(temp_kml_path)
+                
+                # Limpiar archivo temporal
+                Path(temp_kml_path).unlink()
+                
+                if coordinates:
+                    df_input = pd.DataFrame(coordinates, columns=['nombre', 'lat', 'lng'])
+                    st.success(f"✅ Archivo KML procesado: {len(coordinates)} vértices extraídos")
+                    
+                    # Mostrar preview de los vértices extraídos
+                    st.subheader("🔍 Vértices extraídos del KML")
+                    # Formatear coordenadas con mayor precisión
+                    df_display = df_input.head(10).copy()
+                    if 'lat' in df_display.columns:
+                        df_display['lat'] = df_display['lat'].apply(lambda x: f"{x:.10f}")
+                    if 'lng' in df_display.columns:
+                        df_display['lng'] = df_display['lng'].apply(lambda x: f"{x:.10f}")
+                    st.dataframe(df_display, use_container_width=True)
+                    if len(df_input) > 10:
+                        st.info(f"Mostrando los primeros 10 de {len(df_input)} vértices totales")
+                else:
+                    st.error("❌ No se encontraron coordenadas válidas en el archivo KML")
+            else:
+                # Procesar archivo CSV
+                df_input = pd.read_csv(uploaded_file)
+                st.success(f"✅ Archivo cargado: {len(df_input)} filas")
         except Exception as e:
             st.error(f"❌ Error al cargar el archivo: {str(e)}")
     
-    elif 'example_data' in st.session_state:
+    elif 'example_data' in st.session_state and "KML" not in conversion_mode:
         df_input = st.session_state.example_data
         st.info("📋 Usando datos de ejemplo")
     
@@ -267,7 +336,7 @@ def main():
         st.header("🔄 Conversión de coordenadas")
         
         # Validar columnas requeridas
-        if conversion_mode == "WGS84 → Gauss-Krüger":
+        if conversion_mode == "WGS84 → Gauss-Krüger" or "KML" in conversion_mode:
             required_cols = ['nombre', 'lat', 'lng']
         else:
             required_cols = ['nombre', 'coordenadas_gauss_kruger_easting', 'coordenadas_gauss_kruger_northing']
@@ -279,9 +348,14 @@ def main():
         else:
             # Realizar conversión
             with st.spinner('🔄 Convirtiendo coordenadas...'):
-                if conversion_mode == "WGS84 → Gauss-Krüger":
+                if conversion_mode == "WGS84 → Gauss-Krüger" or conversion_mode == "KML → Gauss-Krüger":
                     df_result, errors = convert_wgs84_to_gk(df_input)
                     result_title = "Coordenadas en Gauss-Krüger"
+                elif conversion_mode == "KML → WGS84":
+                    # Para KML a WGS84, los datos ya están en WGS84, solo agregar columnas GK vacías para consistencia
+                    df_result = df_input.copy()
+                    errors = []
+                    result_title = "Vértices extraídos en WGS84"
                 else:
                     df_result, errors = convert_gk_to_wgs84(df_input)
                     result_title = "Coordenadas en WGS84"
@@ -301,8 +375,20 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Mostrar tabla de resultados
-                st.dataframe(df_result, use_container_width=True)
+                # Mostrar tabla de resultados con mayor precisión
+                df_display_result = df_result.copy()
+                
+                # Formatear coordenadas con alta precisión
+                if 'lat' in df_display_result.columns:
+                    df_display_result['lat'] = df_display_result['lat'].apply(lambda x: f"{x:.10f}")
+                if 'lng' in df_display_result.columns:
+                    df_display_result['lng'] = df_display_result['lng'].apply(lambda x: f"{x:.10f}")
+                if 'coordenadas_gauss_kruger_easting' in df_display_result.columns:
+                    df_display_result['coordenadas_gauss_kruger_easting'] = df_display_result['coordenadas_gauss_kruger_easting'].apply(lambda x: f"{x:.6f}")
+                if 'coordenadas_gauss_kruger_northing' in df_display_result.columns:
+                    df_display_result['coordenadas_gauss_kruger_northing'] = df_display_result['coordenadas_gauss_kruger_northing'].apply(lambda x: f"{x:.6f}")
+                
+                st.dataframe(df_display_result, use_container_width=True)
                 
                 # Botones de descarga
                 st.subheader("📥 Descargar resultados")
