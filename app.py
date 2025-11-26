@@ -123,7 +123,7 @@ def convert_gk_to_wgs84(df):
     return pd.DataFrame(results), errors
 
 def create_kml(df, name="Coordenadas"):
-    """Genera contenido KML a partir del DataFrame"""
+    """Genera contenido KML a partir del DataFrame con puntos y polígono"""
     kml_template = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
@@ -134,11 +134,41 @@ def create_kml(df, name="Coordenadas"):
         <scale>1.2</scale>
       </IconStyle>
     </Style>
+    <Style id="polygonStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>2</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4d0000ff</color>
+      </PolyStyle>
+    </Style>
     {placemarks}
+    {polygon}
   </Document>
 </kml>"""
     
     placemarks = []
+    polygon_coords = []
+    
+    # Si el DataFrame tiene coordenadas Gauss-Krüger pero no WGS84, convertir primero
+    if 'coordenadas_gauss_kruger_easting' in df.columns and 'coordenadas_gauss_kruger_northing' in df.columns:
+        if 'lat' not in df.columns or 'lng' not in df.columns:
+            # Convertir GK a WGS84 para el KML
+            transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+            df_temp = df.copy()
+            coords_wgs84 = []
+            for _, row in df_temp.iterrows():
+                lng, lat = transformer.transform(
+                    row['coordenadas_gauss_kruger_easting'],
+                    row['coordenadas_gauss_kruger_northing']
+                )
+                coords_wgs84.append({'lat': lat, 'lng': lng})
+            df_temp['lat'] = [c['lat'] for c in coords_wgs84]
+            df_temp['lng'] = [c['lng'] for c in coords_wgs84]
+            df = df_temp
+    
+    # Crear placemarks para puntos individuales
     for _, row in df.iterrows():
         if 'lat' in row and 'lng' in row:
             placemark = f"""    <Placemark>
@@ -149,8 +179,30 @@ def create_kml(df, name="Coordenadas"):
       </Point>
     </Placemark>"""
             placemarks.append(placemark)
+            polygon_coords.append(f"{row['lng']:.10f},{row['lat']:.10f},0")
     
-    return kml_template.format(name=name, placemarks='\n'.join(placemarks))
+    # Crear polígono si hay 3 o más puntos
+    polygon = ""
+    if len(polygon_coords) >= 3:
+        # Cerrar el polígono si no está cerrado
+        if polygon_coords[0] != polygon_coords[-1]:
+            polygon_coords.append(polygon_coords[0])
+        
+        polygon = f"""    <Placemark>
+      <name>Polígono</name>
+      <styleUrl>#polygonStyle</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              {' '.join(polygon_coords)}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>"""
+    
+    return kml_template.format(name=name, placemarks='\n'.join(placemarks), polygon=polygon)
 
 def calculate_polygon_area_gk(coordinates_gk):
     """
@@ -560,34 +612,103 @@ def main():
                         mime="text/csv"
                     )
                 
-                # Solo generar KML para conversiones a WGS84
-                if conversion_mode == "Gauss-Krüger → WGS84":
-                    with col2:
-                        kml_content = create_kml(df_result, "Coordenadas Convertidas")
-                        st.download_button(
-                            label="🗺️ Descargar KML",
-                            data=kml_content,
-                            file_name=f"coordenadas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.kml",
-                            mime="application/vnd.google-earth.kml+xml"
-                        )
-                    
-                    with col3:
-                        # Crear GeoJSON
+                with col2:
+                    # Generar KML para todos los modos de conversión
+                    kml_content = create_kml(df_result, "Coordenadas Convertidas")
+                    st.download_button(
+                        label="🗺️ Descargar KML",
+                        data=kml_content,
+                        file_name=f"coordenadas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.kml",
+                        mime="application/vnd.google-earth.kml+xml"
+                    )
+                
+                with col3:
+                    # Crear GeoJSON con puntos y polígono
+                    if 'lat' in df_result.columns and 'lng' in df_result.columns:
                         geojson = {
                             "type": "FeatureCollection",
                             "features": []
                         }
                         
+                        # Agregar puntos individuales
+                        polygon_coords = []
                         for _, row in df_result.iterrows():
+                            # Punto individual
                             feature = {
                                 "type": "Feature",
-                                "properties": {"name": row['nombre']},
+                                "properties": {"name": row['nombre'], "type": "point"},
                                 "geometry": {
                                     "type": "Point",
                                     "coordinates": [row['lng'], row['lat']]
                                 }
                             }
                             geojson["features"].append(feature)
+                            polygon_coords.append([row['lng'], row['lat']])
+                        
+                        # Agregar polígono si hay 3 o más puntos
+                        if len(polygon_coords) >= 3:
+                            # Cerrar el polígono
+                            if polygon_coords[0] != polygon_coords[-1]:
+                                polygon_coords.append(polygon_coords[0])
+                            
+                            polygon_feature = {
+                                "type": "Feature",
+                                "properties": {"name": "Polígono", "type": "polygon"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [polygon_coords]
+                                }
+                            }
+                            geojson["features"].append(polygon_feature)
+                        
+                        st.download_button(
+                            label="🌍 Descargar GeoJSON",
+                            data=json.dumps(geojson, indent=2),
+                            file_name=f"coordenadas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.geojson",
+                            mime="application/geo+json"
+                        )
+                    else:
+                        # Si no hay coordenadas WGS84, convertir GK a WGS84 para GeoJSON
+                        transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+                        geojson = {
+                            "type": "FeatureCollection",
+                            "features": []
+                        }
+                        
+                        # Agregar puntos individuales
+                        polygon_coords = []
+                        for _, row in df_result.iterrows():
+                            lng, lat = transformer.transform(
+                                row['coordenadas_gauss_kruger_easting'],
+                                row['coordenadas_gauss_kruger_northing']
+                            )
+                            # Punto individual
+                            feature = {
+                                "type": "Feature",
+                                "properties": {"name": row['nombre'], "type": "point"},
+                                "geometry": {
+                                    "type": "Point",
+                                    "coordinates": [lng, lat]
+                                }
+                            }
+                            geojson["features"].append(feature)
+                            polygon_coords.append([lng, lat])
+                        
+                        # Agregar polígono si hay 3 o más puntos
+                        if len(polygon_coords) >= 3:
+                            # Cerrar el polígono
+                            if polygon_coords[0] != polygon_coords[-1]:
+                                polygon_coords.append(polygon_coords[0])
+                            
+                            polygon_feature = {
+                                "type": "Feature",
+                                "properties": {"name": "Polígono", "type": "polygon"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [polygon_coords]
+                                }
+                            }
+                            geojson["features"].append(polygon_feature)
                         
                         st.download_button(
                             label="🌍 Descargar GeoJSON",
