@@ -26,6 +26,11 @@ from typing import List, Tuple, Dict, Any
 import pyproj
 from pyproj import Transformer
 
+# Gauss-Krüger faja 5 en POSGAR 2007, el marco oficial vigente del IGN.
+# Para coordenadas de planos viejos en Campo Inchauspe usar "EPSG:22195".
+GK_EPSG = "EPSG:5347"
+GK_SISTEMA = "POSGAR 2007 / Argentina faja 5 (EPSG:5347)"
+
 def parse_kml_polygon(kml_path: str) -> List[Tuple[float, float, str]]:
     """Extrae vértices de polígonos de un archivo KML.
     
@@ -241,9 +246,8 @@ def convert_wgs84_to_gk(input_path: str, output_base: str) -> None:
                    - lng: Longitud en grados decimales
         output_base: Nombre base para los archivos de salida (sin extensión)
     """
-    # Definir la transformación de WGS84 a Gauss-Krüger (Campo Inchauspe)
-    # Usando el EPSG:4326 (WGS84) a EPSG:22195 (Gauss-Krüger Zona 5 - Argentina)
-    transformer = Transformer.from_crs("EPSG:4326", "EPSG:22195", always_xy=True)
+    # Definir la transformación de WGS84 (EPSG:4326) a Gauss-Krüger faja 5 (GK_EPSG)
+    transformer = Transformer.from_crs("EPSG:4326", GK_EPSG, always_xy=True)
     
     # Asegurarse de que el directorio de salida exista
     output_dir = Path(output_base).parent
@@ -264,7 +268,7 @@ def convert_wgs84_to_gk(input_path: str, output_base: str) -> None:
             raise ValueError(f"El archivo debe contener las columnas: {', '.join(required_columns)}")
         
         # Configurar el writer de salida
-        fieldnames = ['nombre', 'lat', 'lng', 'coordenadas_gauss_kruger_easting', 'coordenadas_gauss_kruger_northing']
+        fieldnames = ['nombre', 'lat', 'lng', 'coordenadas_gauss_kruger_easting', 'coordenadas_gauss_kruger_northing', 'sistema_gk']
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
         writer.writeheader()
         
@@ -285,7 +289,8 @@ def convert_wgs84_to_gk(input_path: str, output_base: str) -> None:
                     'lat': lat,
                     'lng': lng,
                     'coordenadas_gauss_kruger_easting': easting,
-                    'coordenadas_gauss_kruger_northing': northing
+                    'coordenadas_gauss_kruger_northing': northing,
+                    'sistema_gk': GK_SISTEMA
                 })
                 
                 print(f"Convertido: {nombre} -> Easting: {easting:.6f}, Northing: {northing:.6f}")
@@ -305,9 +310,8 @@ def convert_gk_to_wgs84(input_path: str, output_base: str) -> None:
                    - coordenadas_gauss_kruger_northing: Coordenada Y (Northing)
         output_base: Nombre base para los archivos de salida (sin extensión)
     """
-    # Definir la transformación de Gauss-Krüger (Campo Inchauspe) a WGS84
-    # Usando el EPSG:22195 (Gauss-Krüger Zona 5 - Argentina)
-    transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+    # Definir la transformación de Gauss-Krüger faja 5 (GK_EPSG) a WGS84
+    transformer = Transformer.from_crs(GK_EPSG, "EPSG:4326", always_xy=True)
     
     # Asegurarse de que el directorio de salida exista
     output_dir = Path(output_base).parent
@@ -334,7 +338,7 @@ def convert_gk_to_wgs84(input_path: str, output_base: str) -> None:
             raise ValueError(f"El archivo debe contener las columnas: {', '.join(required_columns)}")
         
         # Configurar el writer de salida
-        fieldnames = ['nombre', 'lat', 'lng']
+        fieldnames = ['nombre', 'lat', 'lng', 'sistema_gk']
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
         writer.writeheader()
         
@@ -357,7 +361,8 @@ def convert_gk_to_wgs84(input_path: str, output_base: str) -> None:
                 writer.writerow({
                     'nombre': nombre,
                     'lat': lat,
-                    'lng': lng
+                    'lng': lng,
+                    'sistema_gk': GK_SISTEMA
                 })
                 
                 print(f"Convertido: {nombre} -> {lat:.10f}, {lng:.10f}")

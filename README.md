@@ -21,7 +21,7 @@ Este conversor permite la **conversión bidireccional** entre coordenadas **Gaus
 - ✅ **Precisión submilimétrica** para mojones de loteos
 - ✅ **Procesamiento masivo** de archivos CSV
 - ✅ **Generación automática** de KML, KMZ y GeoJSON
-- ✅ **Optimizado para Argentina** (Zona 5 - Campo Inchauspe)
+- ✅ **Optimizado para Argentina** (faja 5 - POSGAR 2007)
 
 ---
 
@@ -29,11 +29,13 @@ Este conversor permite la **conversión bidireccional** entre coordenadas **Gaus
 
 ### ¿Qué es Gauss-Krüger?
 
-**Gauss-Krüger** es el sistema de proyección cartográfica oficial de Argentina, basado en el datum **Campo Inchauspe**.
+**Gauss-Krüger** es el sistema de proyección cartográfica oficial de Argentina. Desde 2009 el marco de referencia oficial del IGN es **POSGAR 2007**, que reemplazó a POSGAR 94 y al datum histórico **Campo Inchauspe**.
+
+> ⚠️ **Importante:** la misma proyección (faja 5) sobre datums distintos da coordenadas distintas. Entre Campo Inchauspe (EPSG:22195) y POSGAR 2007 (EPSG:5347) hay un corrimiento de unos **60 m en X y 210 m en Y** en Santa Fe. El conversor usa POSGAR 2007 por defecto y permite elegir los otros sistemas en la barra lateral para trabajar con planos viejos. La salida indica siempre el sistema usado en la columna `sistema_gk`.
 
 #### Características técnicas:
 - **Tipo**: Proyección cilíndrica conforme transversa
-- **Datum**: Campo Inchauspe (EPSG:22195 para Zona 5)
+- **Datum**: POSGAR 2007 (EPSG:5347 para faja 5). Opcionales: POSGAR 94 (EPSG:22185) y Campo Inchauspe (EPSG:22195, histórico)
 - **Unidades**: Metros (Easting/Northing)
 - **Zona de cobertura**: Argentina central (incluye Rosario, Santa Fe)
 - **Preserva**: Ángulos y formas localmente
@@ -62,7 +64,7 @@ Este conversor permite la **conversión bidireccional** entre coordenadas **Gaus
 | **Unidades** | Metros | Grados decimales |
 | **Precisión local** | Submilimétrica | Centimétrica |
 | **Uso oficial** | Argentina (catastro) | Mundial (GPS) |
-| **Formato típico** | X: 5439229.95, Y: 6355430.75 | Lat: -32.9442, Lng: -60.6505 |
+| **Formato típico** | X: 5439170.04, Y: 6355218.96 | Lat: -32.9442, Lng: -60.6505 |
 
 ---
 
@@ -180,11 +182,11 @@ python convert_gk_to_wgs84.py wgs84_to_gk loteo_mojones.csv loteo_gk
 
 #### Resultado (`loteo_gk.csv`):
 ```csv
-nombre,lat,lng,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing
-Mojón 1,-32.9442,-60.6505,5439229.945221076,6355430.748343553
-Mojón 2,-32.9445,-60.6500,5439687.234567891,6355397.123456789
-Mojón 3,-32.9448,-60.6502,5439596.345678912,6355363.234567891
-Mojón 4,-32.9445,-60.6507,5439138.456789123,6355397.345678912
+nombre,lat,lng,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing,sistema_gk
+Mojón 1,-32.9442,-60.6505,5439170.036234934,6355218.955229047,POSGAR 2007 / Argentina faja 5 (EPSG:5347)
+Mojón 2,-32.9445,-60.6500,5439216.998750539,6355185.971899274,POSGAR 2007 / Argentina faja 5 (EPSG:5347)
+Mojón 3,-32.9448,-60.6502,5439198.501264032,6355152.584566705,POSGAR 2007 / Argentina faja 5 (EPSG:5347)
+Mojón 4,-32.9445,-60.6507,5439151.538840751,6355185.567808466,POSGAR 2007 / Argentina faja 5 (EPSG:5347)
 ```
 
 ### Ejemplo 2: Visualizar en Google Maps
@@ -192,9 +194,9 @@ Mojón 4,-32.9445,-60.6507,5439138.456789123,6355397.345678912
 #### Archivo Gauss-Krüger (`mensura.csv`):
 ```csv
 nombre,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing
-Punto A,5439229.95,6355430.75
-Punto B,5439250.12,6355445.33
-Punto C,5439275.88,6355420.67
+Punto A,5439170.04,6355218.96
+Punto B,5439190.21,6355233.54
+Punto C,5439215.97,6355208.88
 ```
 
 #### Comando:
@@ -248,7 +250,7 @@ Descripción del punto,coordenada_x,coordenada_y
 **Ejemplo:**
 ```csv
 nombre,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing
-Mojón esquina NE,5439229.945221076,6355430.748343553
+Mojón esquina NE,5439170.036234934,6355218.955229047
 ```
 
 ### Consideraciones importantes:
@@ -298,7 +300,9 @@ Mojón esquina NE,5439229.945221076,6355430.748343553
 
 ### Sistemas de referencia utilizados:
 - **EPSG:4326**: WGS84 (latitud/longitud)
-- **EPSG:22195**: Gauss-Krüger Zona 5, Campo Inchauspe
+- **EPSG:5347**: POSGAR 2007 / Argentina faja 5 (por defecto, oficial vigente)
+- **EPSG:22185**: POSGAR 94 / Argentina faja 5
+- **EPSG:22195**: Campo Inchauspe / Argentina faja 5 (histórico, solo para planos viejos)
 
 ### Zona de cobertura óptima:
 - **Provincias**: Buenos Aires, Santa Fe, Córdoba, Entre Ríos

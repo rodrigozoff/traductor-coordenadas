@@ -13,6 +13,15 @@ import folium
 from streamlit_folium import st_folium
 import math
 
+# Sistemas Gauss-Krüger faja 5 disponibles. POSGAR 2007 es el marco oficial
+# vigente en Argentina (IGN, 2009); Campo Inchauspe queda solo para planos viejos.
+SISTEMAS_GK = {
+    "POSGAR 2007 / Argentina faja 5 (EPSG:5347)": "EPSG:5347",
+    "POSGAR 94 / Argentina faja 5 (EPSG:22185)": "EPSG:22185",
+    "Campo Inchauspe / Argentina faja 5 (EPSG:22195) - histórico": "EPSG:22195",
+}
+SISTEMA_GK_DEFAULT = "POSGAR 2007 / Argentina faja 5 (EPSG:5347)"
+
 # Configuración de la página
 st.set_page_config(
     page_title="Conversor de Coordenadas Gauss-Krüger ↔ WGS84",
@@ -66,9 +75,9 @@ def create_download_link(df, filename, file_format="csv"):
         href = f'<a href="data:file/csv;base64,{b64}" download="{filename}.csv">📥 Descargar {filename}.csv</a>'
     return href
 
-def convert_wgs84_to_gk(df):
+def convert_wgs84_to_gk(df, sistema_gk=SISTEMA_GK_DEFAULT):
     """Convierte coordenadas de WGS84 a Gauss-Krüger"""
-    transformer = Transformer.from_crs("EPSG:4326", "EPSG:22195", always_xy=True)
+    transformer = Transformer.from_crs("EPSG:4326", SISTEMAS_GK[sistema_gk], always_xy=True)
     
     results = []
     errors = []
@@ -86,7 +95,8 @@ def convert_wgs84_to_gk(df):
                 'lat': lat,
                 'lng': lng,
                 'coordenadas_gauss_kruger_easting': easting,
-                'coordenadas_gauss_kruger_northing': northing
+                'coordenadas_gauss_kruger_northing': northing,
+                'sistema_gk': sistema_gk
             })
             
         except Exception as e:
@@ -94,9 +104,9 @@ def convert_wgs84_to_gk(df):
     
     return pd.DataFrame(results), errors
 
-def convert_gk_to_wgs84(df):
+def convert_gk_to_wgs84(df, sistema_gk=SISTEMA_GK_DEFAULT):
     """Convierte coordenadas de Gauss-Krüger a WGS84"""
-    transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+    transformer = Transformer.from_crs(SISTEMAS_GK[sistema_gk], "EPSG:4326", always_xy=True)
     
     results = []
     errors = []
@@ -114,7 +124,8 @@ def convert_gk_to_wgs84(df):
                 'lat': lat,
                 'lng': lng,
                 'coordenadas_gauss_kruger_easting': easting,
-                'coordenadas_gauss_kruger_northing': northing
+                'coordenadas_gauss_kruger_northing': northing,
+                'sistema_gk': sistema_gk
             })
             
         except Exception as e:
@@ -122,7 +133,7 @@ def convert_gk_to_wgs84(df):
     
     return pd.DataFrame(results), errors
 
-def create_kml(df, name="Coordenadas"):
+def create_kml(df, name="Coordenadas", sistema_gk=SISTEMA_GK_DEFAULT):
     """Genera contenido KML a partir del DataFrame con puntos y polígono"""
     kml_template = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -155,7 +166,7 @@ def create_kml(df, name="Coordenadas"):
     if 'coordenadas_gauss_kruger_easting' in df.columns and 'coordenadas_gauss_kruger_northing' in df.columns:
         if 'lat' not in df.columns or 'lng' not in df.columns:
             # Convertir GK a WGS84 para el KML
-            transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+            transformer = Transformer.from_crs(SISTEMAS_GK[sistema_gk], "EPSG:4326", always_xy=True)
             df_temp = df.copy()
             coords_wgs84 = []
             for _, row in df_temp.iterrows():
@@ -276,7 +287,7 @@ def main():
         <h3>📍 Conversor Profesional para Argentina</h3>
         <p><strong>Precisión catastral</strong> para mojones de loteos, mensuras y aplicaciones profesionales.</p>
         <ul>
-            <li><strong>Gauss-Krüger:</strong> Sistema oficial argentino (EPSG:22195 - Zona 5)</li>
+            <li><strong>Gauss-Krüger:</strong> POSGAR 2007 faja 5 (EPSG:5347), marco oficial vigente del IGN. Se puede elegir otro sistema en la barra lateral.</li>
             <li><strong>WGS84:</strong> Sistema GPS/Google Maps (EPSG:4326)</li>
             <li><strong>Precisión:</strong> Submilimétrica (hasta 15 decimales)</li>
         </ul>
@@ -292,6 +303,17 @@ def main():
             ["KML → Gauss-Krüger", "WGS84 → Gauss-Krüger", "Gauss-Krüger → WGS84"],
             help="Selecciona el tipo de conversión que necesitas"
         )
+        
+        sistema_gk = st.selectbox(
+            "Sistema Gauss-Krüger:",
+            list(SISTEMAS_GK.keys()),
+            index=list(SISTEMAS_GK.keys()).index(SISTEMA_GK_DEFAULT),
+            help="POSGAR 2007 es el marco oficial vigente (catastro, IDESF, mensuras actuales). "
+                 "Usá Campo Inchauspe solo para coordenadas de planos anteriores a POSGAR: "
+                 "entre ambos sistemas hay un corrimiento de unos 200 m."
+        )
+        if SISTEMAS_GK[sistema_gk] == "EPSG:22195":
+            st.warning("⚠️ Campo Inchauspe es un datum histórico. Sus coordenadas difieren ~200 m de POSGAR 2007.")
         
         st.markdown("---")
         
@@ -309,7 +331,7 @@ def main():
             **📄 Formato requerido:**
             ```csv
             nombre,coordenadas_gauss_kruger_easting,coordenadas_gauss_kruger_northing
-            Mojón 1,5439229.95,6355430.75
+            Mojón 1,5439170.04,6355218.96
             ```
             """)
         elif "KML" in conversion_mode:
@@ -363,8 +385,8 @@ def main():
             else:
                 example_data = pd.DataFrame({
                     'nombre': ['Mojón 1', 'Mojón 2', 'Mojón 3'],
-                    'coordenadas_gauss_kruger_easting': [5439229.945221, 5440260.962679, 5441349.818856],
-                    'coordenadas_gauss_kruger_northing': [6355430.748344, 6355048.873111, 6355931.615095]
+                    'coordenadas_gauss_kruger_easting': [5439170.036235, 5440201.051327, 5441289.905108],
+                    'coordenadas_gauss_kruger_northing': [6355218.955229, 6354837.080781, 6355719.820668]
                 })
             
             st.dataframe(example_data, use_container_width=True)
@@ -455,11 +477,11 @@ def main():
             # Realizar conversión
             with st.spinner('🔄 Convirtiendo coordenadas...'):
                 if conversion_mode == "WGS84 → Gauss-Krüger" or conversion_mode == "KML → Gauss-Krüger":
-                    df_result, errors = convert_wgs84_to_gk(df_input)
-                    result_title = "Coordenadas en Gauss-Krüger"
+                    df_result, errors = convert_wgs84_to_gk(df_input, sistema_gk)
+                    result_title = f"Coordenadas en Gauss-Krüger ({sistema_gk})"
                 else:
-                    df_result, errors = convert_gk_to_wgs84(df_input)
-                    result_title = "Coordenadas en WGS84"
+                    df_result, errors = convert_gk_to_wgs84(df_input, sistema_gk)
+                    result_title = f"Coordenadas en WGS84 (desde {sistema_gk})"
             
             # Mostrar errores si los hay
             if errors:
@@ -539,7 +561,7 @@ def main():
                             <br><b>📐 Gauss-Krüger:</b><br>
                             Easting: {row['coordenadas_gauss_kruger_easting']:.6f}<br>
                             Northing: {row['coordenadas_gauss_kruger_northing']:.6f}<br>
-                            <small>EPSG:22195 - Zona 5</small>
+                            <small>{row['sistema_gk']}</small>
                             """
                         
                         folium.Marker(
@@ -614,7 +636,7 @@ def main():
                 
                 with col2:
                     # Generar KML para todos los modos de conversión
-                    kml_content = create_kml(df_result, "Coordenadas Convertidas")
+                    kml_content = create_kml(df_result, "Coordenadas Convertidas", sistema_gk)
                     st.download_button(
                         label="🗺️ Descargar KML",
                         data=kml_content,
@@ -669,7 +691,7 @@ def main():
                         )
                     else:
                         # Si no hay coordenadas WGS84, convertir GK a WGS84 para GeoJSON
-                        transformer = Transformer.from_crs("EPSG:22195", "EPSG:4326", always_xy=True)
+                        transformer = Transformer.from_crs(SISTEMAS_GK[sistema_gk], "EPSG:4326", always_xy=True)
                         geojson = {
                             "type": "FeatureCollection",
                             "features": []
@@ -739,7 +761,7 @@ def main():
     <div style="text-align: center; color: #666; padding: 2rem;">
         <p><strong>Conversor de Coordenadas Gauss-Krüger ↔ WGS84</strong></p>
         <p>Desarrollado por Rodrigo Zoff • <a href="mailto:rodrigo@zoff.tech">rodrigo@zoff.tech</a> • 2025</p>
-        <p>Precisión catastral para Argentina • Sistema optimizado para Zona 5 (EPSG:22195)</p>
+        <p>Precisión catastral para Argentina • Gauss-Krüger faja 5 • POSGAR 2007 (EPSG:5347) por defecto</p>
         <p>Rosario, Santa Fe, Buenos Aires</p>
     </div>
     """, unsafe_allow_html=True)
@@ -769,7 +791,7 @@ def main():
         st.markdown("""
         <div style="text-align: center; padding: 10px;">
             <h6>📍 Zona</h6>
-            <p style="margin: 0; font-size: 0.8em;">Argentina Central<br><small>EPSG:22195</small></p>
+            <p style="margin: 0; font-size: 0.8em;">Faja 5 POSGAR 2007<br><small>EPSG:5347</small></p>
         </div>
         """, unsafe_allow_html=True)
     
